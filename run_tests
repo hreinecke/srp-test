@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+# Copyright (c) 2016 Western Digital Corporation or its affiliates
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc.
+
+scriptdir=$(dirname "$0")
+
+# shellcheck source=lib/functions
+. "$scriptdir/lib/functions"
+
+# Verify whether all required software has been installed
+pre_check() {
+    for e in fio mkfs.xfs multipathd pidof sg_reset; do
+	if ! type -P "$e" >/dev/null 2>&1; then
+	    echo "Error: could not find $e"
+	    return 1
+	fi
+    done
+}
+
+
+# Set up test configuration
+setup() {
+    local p
+
+    if ! pidof multipathd >/dev/null; then
+	echo "Error: multipathd is not running"
+	return 1
+    fi
+
+    /etc/init.d/srpd stop >/dev/null 2>&1
+    if pidof srp_daemon >/dev/null; then
+	echo "Error: failed to stop srp_daemon"
+	return 1
+    fi
+
+    stop_srp
+
+    stop_srpt
+
+    start_srpt || return $?
+
+    start_srp ch_count=2
+}
+
+# Undo setup()
+teardown() {
+    stop_srp
+    stop_srpt
+}
+
+# Run the actual SRP tests
+run_tests() {
+    local success=0 failure=0
+
+    for t in "$scriptdir"/tests/*; do
+	[ "${t%\~}" != "$t" ] && continue
+	echo "Running test $t ..."
+	if "$t"; then
+	    echo "Test $t succeeded"
+	    ((success++))
+	else
+	    echo "Test $t failed"
+	    ((failure++))
+	fi
+    done
+    echo "$success tests succeeded and $failure tests failed"
+}
+
+pre_check &&
+    setup &&
+    {
+	run_tests
+	teardown
+    }

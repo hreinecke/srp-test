@@ -1,0 +1,291 @@
+#!/bin/bash
+#
+# Copyright (c) 2016 Western Digital Corporation or its affiliates
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc.
+
+vdev_path=(/dev/ram0 /dev/ram1)
+scsi_serial=(ramdisk1 ramdisk2)
+mountpoint=("$PWD/mnt1" "$PWD/mnt2")
+ramdisk_size=$((1<<30)) # 1 GiB
+
+# Make the SRP initiator driver log in to each SRP target port.
+srp_log_in() {
+    local add_param d guid ibdev port
+
+    for d in /dev/infiniband/umad*; do
+	sysfsdir=/sys/class/infiniband_mad/$(basename "$d")
+	ibdev=$(<"$sysfsdir/ibdev")
+	port=$(<"$sysfsdir/port")
+	guid=$(<"/sys/class/infiniband/$ibdev/ports/$port/gids/0")
+	guid=${guid//:}
+	ibsrpdm -c -d "$d" |
+	    grep "dgid=$guid" |
+	    while read -r line; do
+		for p in /sys/class/infiniband_srp/*; do
+		    {
+			echo "$line,$add_param" >"$p/add_target"
+		    } 2>/dev/null
+		done
+	    done
+    done
+}
+
+# Tell the SRP initiator driver to log out.
+srp_log_out() {
+    local p
+
+    if [ -e /sys/class/srp_remote_ports ]; then
+	for p in /sys/class/srp_remote_ports/*; do
+	    [ -e "$p" ] && echo 1 >"$p/delete" &
+	done
+    fi
+    wait
+}
+
+remove_srp_mpath_devs() {
+    (
+	cd /sys/class/scsi_host &&
+	    for p in /sys/class/srp_remote_ports/*; do
+		[ -e "$p" ] || continue
+		h="${p##*/}"; h="${h#port-}"; h="${h%:1}"
+		for d in /sys/class/scsi_device/${h}:*/device/block/*; do
+		    [ -e "$d" ] || continue
+		    s=$(dirname "$(dirname "$(dirname "$d")")")
+		    b=$(basename "$d")
+		    for h in /sys/class/block/$b/holders/*; do
+			[ -e "$h" ] || continue
+			dm=/dev/$(basename "$h")
+			echo "SRP LUN $s / $b: removing $dm"
+			dmsetup remove "$dm"
+		    done
+		done
+	    done
+    )
+}
+
+# Load the SRP initiator driver with kernel module parameters $1..$n.
+start_srp() {
+    modprobe scsi_transport_srp
+    modprobe ib_srp "$*" || return $?
+}
+
+# Unload the SRP initiator driver.
+stop_srp() {
+    srp_log_out
+    remove_srp_mpath_devs
+    for ((i=20;i>=0;i--)); do
+	modprobe -r ib_srp >/dev/null 2>&1 && break
+	sleep .1
+    done
+    [ $i -gt 0 ] || return $?
+    if [ -e /sys/module/ib_srp ]; then
+	echo "Error: unloading kernel module ib_srp failed"
+	return 1
+    fi
+    modprobe -r scsi_transport_srp || return $?
+    echo "Unloaded the ib_srp kernel module"
+}
+
+# Load the configfs kernel module and mount it.
+mount_configfs() {
+    if [ ! -e /sys/module/configfs ]; then
+	modprobe configfs || return $?
+    fi
+    if ! mount | grep -qw configfs; then
+	mount -t configfs none /sys/kernel/config || return $?
+    fi
+}
+
+# Associate the LIO device with name $1/$2 with file $3 and SCSI serial $4.
+configure_lio_vdev() {
+    local dirname=$1 vdev=$2 path=$3 serial=$4
+
+    (
+	cd /sys/kernel/config/target/core &&
+	    mkdir "$dirname" &&
+	    cd "$dirname" &&
+	    mkdir "$vdev" &&
+	    cd "$vdev" &&
+	    if [ -b "$path" ]; then
+		echo "udev_path=$path," >control
+	    else
+		size=$(stat -c %s "${path}") &&
+		    [ "$size" -gt 0 ] &&
+		    echo "fd_dev_name=$path,fd_dev_size=$size," >control
+	    fi &&
+	    echo "${serial}" >wwn/vpd_unit_serial &&
+	    echo 1 > enable
+    )
+}
+
+lio_scsi_mpath_id() {
+    local i=$1 hs
+
+    hs=$(echo -n "${scsi_serial[i]}" | od -v -tx1 -w99 |
+		{ read -r offset bytes;
+		  echo "${bytes// }";
+		  echo "$offset" > /dev/null
+		})
+    while [ ${#hs} -lt 25 ]; do
+	hs="${hs}0"
+    done
+    # See also spc_emulate_evpd_83() in drivers/target/target_core_spc.c.
+    echo "36001405$hs"
+}
+
+scsi_mpath_id() {
+    lio_scsi_mpath_id "$@"
+}
+
+# Load LIO and configure the SRP target driver and LUNs
+start_lio_srpt() {
+    local b d hca i m p r rdma_port vdev
+
+    rdma_port=()
+    hca=($(sed 's/^/0x/;s/://g' /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
+    rdma_port=($(sed 's/^fe8/0x000/;s/://g' /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
+    mount_configfs || return $?
+    modprobe target_core_mod || return $?
+    modprobe target_core_iblock || return $?
+    insmod "/lib/modules/$(uname -r)/kernel/drivers/infiniband/ulp/srpt/ib_srpt.ko" srp_max_req_size=4200 dyndbg=+pmf || return $?
+    i=0
+    for r in "${vdev_path[@]}"; do
+	if [ -b "$r" ]; then
+	    oflag=oflag=direct
+	else
+	    oflag=
+	fi
+	dd if=/dev/zero of="${r}" bs=1M count=$((ramdisk_size>>20)) ${oflag} >/dev/null 2>&1 || return $?
+	mkfs.xfs -q "${r}" || return $?
+	mkdir -p "${mountpoint[i]}"
+	((i++))
+    done
+    vdev=(iblock_0/vdev0 iblock_1/vdev1)
+    for ((i=0; i < ${#vdev[@]}; i++)); do
+	d="$(dirname "${vdev[i]}")"
+	b="$(basename "${vdev[i]}")"
+	hs=$(lio_scsi_mpath_id "$i")
+	hs=${hs#36001405}
+	configure_lio_vdev "$d" "$b" "${vdev_path[i]}" "$hs" ||
+	    return $?
+    done
+    (
+	cd /sys/kernel/config/target || exit $?
+	mkdir srpt || exit $?
+	cd srpt || exit $?
+	for hca in "${hca[@]}"; do
+	    mkdir "$hca" || exit $?
+	    [ -e "$hca" ] || continue
+	    #echo "$hca"
+	    mkdir "$hca/$hca" || exit $?
+	    i=0
+	    for v in "${vdev[@]}"; do
+		mkdir "$hca/$hca/lun/lun_$i" || exit $?
+		(
+		    cd "$hca/$hca/lun/lun_$i" &&
+			ln -s "../../../../../core/$v"
+		) || exit $?
+		i=$((i+1))
+	    done
+	    for p in "${rdma_port[@]}"; do
+		(
+		    cd "$hca/$hca/acls" &&
+			mkdir "${p}" &&
+			cd "${p}" &&
+			for ((i = 0; i < ${#vdev[@]}; i++)) do
+			    (
+				mkdir lun_$i &&
+				    cd lun_$i &&
+				    ln -s ../../../lun/lun_$i
+			    ) || exit $?
+			done
+		) || exit $?
+		echo 1 >"$hca/$hca/enable"
+	    done
+	done
+    )
+}
+
+# Load and configure the SRP target driver
+start_srpt() {
+    modprobe brd rd_nr=${#vdev_path[@]} rd_size=$((ramdisk_size>>10))
+    start_lio_srpt || return $?
+    echo "Configured SRP target driver"
+}
+
+# Unload the LIO SRP target driver.
+stop_lio_srpt() {
+    local hca
+
+    mount_configfs
+    for e in /sys/kernel/config/target/srpt/$hca/$hca/enable; do
+	if [ -e "$e" ]; then
+	    echo 0 >"$e"
+	fi
+    done
+
+    rm -f /sys/kernel/config/target/srpt/*/*/acls/*/*/* >&/dev/null
+    rmdir /sys/kernel/config/target/srpt/*/*/acls/*/* >&/dev/null
+    rmdir /sys/kernel/config/target/srpt/*/*/acls/* >&/dev/null
+    rm -f /sys/kernel/config/target/srpt/*/*/lun/*/* >&/dev/null
+    rmdir /sys/kernel/config/target/srpt/*/*/lun/* >&/dev/null
+    rmdir /sys/kernel/config/target/srpt/*/* >&/dev/null
+    rmdir /sys/kernel/config/target/srpt/* >&/dev/null
+    rmdir /sys/kernel/config/target/srpt >&/dev/null
+
+    if [ -e /sys/module/ib_srpt ]; then
+	modprobe -r ib_srpt
+    fi
+
+    rmdir /sys/kernel/config/target/core/*/* >&/dev/null
+    rmdir /sys/kernel/config/target/core/* >&/dev/null
+
+    for m in ib_srpt target_core_pscsi target_core_iblock target_core_file \
+		     target_core_stgt target_core_user target_core_mod
+    do
+	if [ -e /sys/module/$m ]; then
+	    modprobe -r $m
+	fi
+    done
+}
+
+# Unload the SRP target driver.
+stop_srpt() {
+    stop_lio_srpt || return $?
+    modprobe -r brd
+    rm -f "${vdev_path[@]}"
+    echo "Unloaded the ib_srpt kernel module"
+}
+
+# Look up the block device below the filesystem on which directory $1 exists.
+block_dev_of_dir() {
+    df "$1" | {
+	read -r header
+	echo "$header" >/dev/null
+	read -r blockdev rest
+	echo "$blockdev"
+    }
+}
+
+unmount_and_check() {
+    local m=$1
+
+    umount "$m" >/dev/null 2>&1
+    if [ "$(block_dev_of_dir "$m")" != "$(block_dev_of_dir "$(dirname "$m")")" ]; then
+	echo "Error: unmounting $m failed"
+	return 1
+    fi
+}

@@ -1,0 +1,39 @@
+#!/bin/bash
+#
+# Copyright (c) 2016 Western Digital Corporation or its affiliates
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc.
+
+# shellcheck source=lib/functions
+. "$(dirname "$0")/../lib/functions"
+
+# Count the number of LUNs created by start_srpt() from the initiator side.
+count_luns() {
+    local luns=0
+
+    srp_log_in
+    for p in /sys/class/srp_remote_ports/*; do
+	[ -e "$p" ] || continue
+	h="${p##*/}"; h="${h#port-}"; h="${h%:1}";
+	for d in /sys/class/scsi_device/$h:*; do
+	    [ -e "$d" ] && ((luns++))
+	done
+	break
+    done
+    echo "count_luns(): $luns <> ${#vdev_path[@]}"
+    [ $luns = ${#vdev_path[@]} ]
+}
+
+count_luns
