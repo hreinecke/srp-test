@@ -45,6 +45,7 @@ test_disconnect_repeatedly() {
     fio_status=$?
     kill $pid
     wait
+    srp_log_in
     unmount_and_check "$m" || return $?
     return $fio_status
 }
