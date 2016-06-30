@@ -68,8 +68,8 @@ remove_srp_mpath_devs() {
 		    for h in /sys/class/block/$b/holders/*; do
 			[ -e "$h" ] || continue
 			dm=/dev/$(basename "$h")
-			echo "SRP LUN $s / $b: removing $dm"
-			dmsetup remove "$dm" || return $?
+			echo -n "SRP LUN $s / $b: removing $dm: "
+			dmsetup remove "$dm" && echo "done"
 		    done
 		done
 	    done
