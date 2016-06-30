@@ -47,9 +47,9 @@ setup() {
 	return 1
     fi
 
-    stop_srp
+    stop_srp || return $?
 
-    stop_srpt
+    stop_srpt || return $?
 
     start_srpt || return $?
 
