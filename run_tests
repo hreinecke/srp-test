@@ -83,12 +83,16 @@ teardown() {
 
 # Run the actual SRP tests
 run_tests() {
-    local success=0 failure=0
+    local success=0 failure=0 opts
 
+    opts=()
+    if [ -n "$debug" ]; then
+	opts+=(-d)
+    fi
     for t in "$scriptdir"/tests/*; do
 	[ "${t%\~}" != "$t" ] && continue
 	echo "Running test $t ..."
-	if "$t"; then
+	if "$t" "${opts[@]}"; then
 	    echo "Test $t succeeded"
 	    ((success++))
 	else
