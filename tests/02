@@ -21,6 +21,7 @@
 
 disconnect_srp_loop() {
     while :; do
+	sleep 5
 	srp_log_out
 	sleep 5
 	srp_log_in
