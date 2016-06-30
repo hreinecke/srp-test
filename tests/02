@@ -46,8 +46,14 @@ test_disconnect_repeatedly() {
     kill $pid
     wait
     srp_log_in
-    unmount_and_check "$m" || return $?
+    if [ $fio_status = 0 ] && [ ! -n "$debug" ]; then
+       unmount_and_check "$m" || return $?
+    fi
     return $fio_status
 }
+
+if [ "$1" = "-d" ]; then
+    debug=1
+fi
 
 test_disconnect_repeatedly
