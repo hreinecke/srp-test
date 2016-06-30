@@ -35,7 +35,7 @@ test_disconnect_repeatedly() {
     dev="/dev/disk/by-id/dm-uuid-mpath-$(scsi_mpath_id 0)"
     m=${mountpoint[0]}
     unmount_and_check "$m" || return $?
-    mount "$dev" "$m" || return $?
+    mount_and_check "$dev" "$m" || return $?
     disconnect_srp_loop &
     pid=$!
     fio --verify=md5 -rw=randwrite --size=10M --bs=4K --loops=$((10**6)) \

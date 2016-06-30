@@ -280,6 +280,17 @@ block_dev_of_dir() {
     }
 }
 
+mount_and_check() {
+    local dir last
+
+    dir=$(for last; do :; done; echo "$last")
+    mount "$@"
+    if [ "$(block_dev_of_dir "$dir")" = "$(block_dev_of_dir "$(dirname "$dir")")" ]; then
+	echo "Error: mount $* failed"
+	return 1
+    fi
+}
+
 unmount_and_check() {
     local m=$1
 
