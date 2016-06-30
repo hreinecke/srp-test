@@ -21,6 +21,21 @@ scriptdir=$(dirname "$0")
 # shellcheck source=lib/functions
 . "$scriptdir/lib/functions"
 
+usage() {
+    echo "Usage: $1 [-d]"
+    exit 1
+}
+
+parse_cmdline() {
+    while [ "${1#-}" != "$1" ]; do
+	case "${1#-}" in
+	    d) debug=1;;
+	    *) usage "$(dirname "$0")";;
+	esac
+	shift
+    done
+}
+
 # Verify whether all required software has been installed
 pre_check() {
     for e in fio mkfs.xfs multipathd pidof sg_reset; do
@@ -75,12 +90,18 @@ run_tests() {
 	else
 	    echo "Test $t failed"
 	    ((failure++))
+	    if [ -n "$debug" ]; then
+		exit $?
+	    fi
 	fi
     done
     echo "$success tests succeeded and $failure tests failed"
 }
 
-pre_check &&
+debug=
+
+parse_cmdline "$@" &&
+    pre_check &&
     setup &&
     {
 	run_tests
