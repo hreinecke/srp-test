@@ -66,6 +66,10 @@ setup() {
 
     stop_srpt || return $?
 
+    for m in ; do
+        echo module $m +pmf >/sys/kernel/debug/dynamic_debug/control
+    done
+
     start_srpt || return $?
 
     start_srp ch_count=2
