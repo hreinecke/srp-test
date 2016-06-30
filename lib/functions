@@ -74,6 +74,32 @@ remove_srp_mpath_devs() {
 		done
 	    done
     )
+    # Find all multipaths with one or more deleted devices and remove these
+    dmsetup table | while read -r mpdev fs ls type def; do
+	echo "$fs $ls" >/dev/null
+	if [ "$type" = multipath ]; then
+	    for d in $def; do
+		if [ "${d/://}" != "$d" ]; then
+		    grep -qw "$d" /sys/class/block/*/dev || echo "${mpdev%:}"
+		fi
+	    done
+	fi
+    done |
+	sort -u |
+	while read -r mpdev; do
+	    mpdev="/dev/mapper/$mpdev"
+	    echo -n "removing $mpdev: "
+	    dmsetup message "$mpdev" 0 fail_if_no_path
+	    for ((i=10;i>=0;i--)); do
+		if dmsetup remove "$mpdev" >/dev/null 2>&1; then
+		    echo "done"
+		    break
+		fi
+		sleep .1
+	    done
+	    [ $i = 0 ] && echo "failed"
+	done
+    return 0
 }
 
 # Load the SRP initiator driver with kernel module parameters $1..$n.
