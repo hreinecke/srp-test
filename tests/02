@@ -48,7 +48,7 @@ test_disconnect_repeatedly() {
     fio --verify=md5 -rw=randwrite --size=10M --bs=4K --loops=$((10**6)) \
 	--iodepth=64 --group_reporting --sync=1 --direct=1 --ioengine=libaio \
 	--directory="$m" --name=data-integrity-test --thread --numjobs=16 \
-	--runtime=600 --output=fio-output.txt >/dev/null
+	--runtime=600 --output=fio-output-02.txt >/dev/null
     fio_status=$?
     kill $pid
     wait
