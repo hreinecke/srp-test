@@ -23,7 +23,7 @@
 count_luns() {
     local h i luns p
 
-    srp_log_in
+    srp_log_in ""
     for ((i=0;i<100;i++)); do
 	luns=0
 	for p in /sys/class/srp_remote_ports/*; do

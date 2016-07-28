@@ -23,7 +23,7 @@ ramdisk_size=$((1<<30)) # 1 GiB
 
 # Make the SRP initiator driver log in to each SRP target port.
 srp_log_in() {
-    local add_param d guid ibdev port
+    local add_param=$1 d guid ibdev port
 
     for d in /dev/infiniband/umad*; do
 	sysfsdir=/sys/class/infiniband_mad/$(basename "$d")
