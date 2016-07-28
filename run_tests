@@ -17,12 +17,13 @@
 # Foundation, Inc.
 
 scriptdir=$(dirname "$0")
+tests=()
 
 # shellcheck source=lib/functions
 . "$scriptdir/lib/functions"
 
 usage() {
-    echo "Usage: $1 [-d]"
+    echo "Usage: $1 [-d] [-t <test>]*"
     exit 1
 }
 
@@ -30,10 +31,13 @@ parse_cmdline() {
     while [ "${1#-}" != "$1" ]; do
 	case "${1#-}" in
 	    d) debug=1;;
+	    t) tests+=($2); shift;;
 	    *) usage "$(dirname "$0")";;
 	esac
 	shift
     done
+
+    [ $# = 0 ] || usage "$(dirname "$0")"
 }
 
 # Verify whether all required software has been installed
@@ -83,13 +87,22 @@ teardown() {
 
 # Run the actual SRP tests
 run_tests() {
-    local success=0 failure=0 opts
+    local success=0 failure=0 i opts t
 
     opts=()
     if [ -n "$debug" ]; then
 	opts+=(-d)
     fi
-    for t in "$scriptdir"/tests/*; do
+    if [ ${#tests[@]} = 0 ]; then
+	for t in "$scriptdir/tests"/*; do
+	    tests+=("$t")
+	done
+    else
+	for ((i=0;i<${#tests[@]};i++)); do
+	    tests[i]="$scriptdir/tests/${tests[i]}"
+	done
+    fi
+    for t in "${tests[@]}"; do
 	[ "${t%\~}" != "$t" ] && continue
 	echo "Running test $t ..."
 	if "$t" "${opts[@]}"; then
