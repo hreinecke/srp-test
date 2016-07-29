@@ -196,7 +196,6 @@ start_lio_srpt() {
 	    oflag=
 	fi
 	dd if=/dev/zero of="${r}" bs=1M count=$((ramdisk_size>>20)) ${oflag} >/dev/null 2>&1 || return $?
-	mkfs.xfs -q "${r}" || return $?
 	mkdir -p "${mountpoint[i]}"
 	((i++))
     done
