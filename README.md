@@ -20,7 +20,7 @@ Running the Tests
   reinstall the kernel if necessary.
 * Install the following software packages if these have not yet been
   installed: fio, gcc-c++, make, multipath-tools or device-mapper-multipath,
-  sg3_utils, srptools and xfsprogs.
+  sg3_utils, srptools, e2fsprogs and xfsprogs.
 * Configure multipathd such that it recognizes the SRP LUNs that will be
   created by this test suite. Merge the following into `/etc/multipath.conf`:
 

@@ -20,6 +20,7 @@ vdev_path=(/dev/ram0 /dev/ram1)
 scsi_serial=(ramdisk1 ramdisk2)
 mountpoint=("$PWD/mnt1" "$PWD/mnt2")
 ramdisk_size=$((1<<30)) # 1 GiB
+filesystem_type=
 
 # Make the SRP initiator driver log in to each SRP target port.
 srp_log_in() {
@@ -304,6 +305,19 @@ block_dev_of_dir() {
 	read -r blockdev rest
 	echo "$blockdev"
     }
+}
+
+create_filesystem() {
+    local dev=$1
+
+    case "$filesystem_type" in
+	ext4)
+	    mkfs.ext4 -F -O ^has_journal -q "$dev";;
+	xfs)
+	    mkfs.xfs -f -q "$dev";;
+	*)
+	    return 1;;
+    esac
 }
 
 mount_and_check() {

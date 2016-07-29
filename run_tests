@@ -18,12 +18,13 @@
 
 scriptdir=$(dirname "$0")
 tests=()
+filesystem_type=xfs
 
 # shellcheck source=lib/functions
 . "$scriptdir/lib/functions"
 
 usage() {
-    echo "Usage: $1 [-d] [-t <test>]*"
+    echo "Usage: $1 [-d] [-f <filesystem type>] [-t <test>]*"
     exit 1
 }
 
@@ -31,6 +32,7 @@ parse_cmdline() {
     while [ "${1#-}" != "$1" ]; do
 	case "${1#-}" in
 	    d) debug=1;;
+	    f) filesystem_type=$2; shift;;
 	    t) tests+=($2); shift;;
 	    *) usage "$(dirname "$0")";;
 	esac
@@ -42,7 +44,7 @@ parse_cmdline() {
 
 # Verify whether all required software has been installed
 pre_check() {
-    for e in fio mkfs.xfs multipathd pidof sg_reset; do
+    for e in fio mkfs.ext4 mkfs.xfs multipathd pidof sg_reset; do
 	if ! type -P "$e" >/dev/null 2>&1; then
 	    echo "Error: could not find $e"
 	    return 1
@@ -92,6 +94,9 @@ run_tests() {
     opts=()
     if [ -n "$debug" ]; then
 	opts+=(-d)
+    fi
+    if [ -n "$filesystem_type" ]; then
+	opts+=(-f "$filesystem_type")
     fi
     if [ ${#tests[@]} = 0 ]; then
 	for t in "$scriptdir/tests"/*; do

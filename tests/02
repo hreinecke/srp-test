@@ -19,6 +19,11 @@
 # shellcheck source=lib/functions
 . "$(dirname "$0")/../lib/functions"
 
+usage() {
+    echo "Usage: $1 [-d] [-f <filesystem type>]"
+    exit 1
+}
+
 disconnect_srp_loop() {
     while :; do
 	sleep 5
@@ -36,7 +41,7 @@ test_disconnect_repeatedly() {
     dev="/dev/disk/by-id/dm-uuid-mpath-$(scsi_mpath_id 0)"
     m=${mountpoint[0]}
     unmount_and_check "$m" || return $?
-    mkfs.xfs -f -q "$dev" || return $?
+    create_filesystem "$dev" || return $?
     mount_and_check "$dev" "$m" || return $?
     disconnect_srp_loop &
     pid=$!
@@ -54,8 +59,18 @@ test_disconnect_repeatedly() {
     return $fio_status
 }
 
-if [ "$1" = "-d" ]; then
-    debug=1
-fi
+parse_cmdline() {
+    while [ "${1#-}" != "$1" ]; do
+	case "${1#-}" in
+	    d) debug=1;;
+	    f) filesystem_type=$2; shift;;
+	    *) usage "$(dirname "$0")";;
+	esac
+	shift
+    done
 
-test_disconnect_repeatedly
+    [ $# = 0 ] || usage "$(dirname "$0")"
+}
+
+parse_cmdline "$@" &&
+    test_disconnect_repeatedly
