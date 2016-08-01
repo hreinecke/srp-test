@@ -80,7 +80,8 @@ remove_srp_mpath_devs() {
 	if [ "$type" = multipath ]; then
 	    for d in $def; do
 		if [ "${d/://}" != "$d" ]; then
-		    grep -qw "$d" /sys/class/block/*/dev || echo "${mpdev%:}"
+		    { grep -qw "$d" /sys/class/block/*/dev ||
+			    echo "${mpdev%:}"; } 2>/dev/null
 		fi
 	    done
 	fi
