@@ -104,6 +104,14 @@ remove_srp_mpath_devs() {
     return 0
 }
 
+unload_module() {
+    local m=$1
+
+    if [ -e "/sys/module/$m" ]; then
+	modprobe -r "$m"
+    fi
+}
+
 # Load the SRP initiator driver with kernel module parameters $1..$n.
 start_srp() {
     modprobe scsi_transport_srp
@@ -115,15 +123,14 @@ stop_srp() {
     srp_log_out
     remove_srp_mpath_devs || return $?
     for ((i=20;i>=0;i--)); do
-	[ -e /sys/module/ib_srp ] || break
-	modprobe -r ib_srp >/dev/null 2>&1 && break
+	unload_module ib_srp >/dev/null 2>&1 && break
 	sleep .1
     done
     if [ -e /sys/module/ib_srp ]; then
 	echo "Error: unloading kernel module ib_srp failed"
 	return 1
     fi
-    modprobe -r scsi_transport_srp || return $?
+    unload_module scsi_transport_srp || return $?
     echo "Unloaded the ib_srp kernel module"
 }
 
@@ -266,9 +273,7 @@ stop_lio_srpt() {
     rmdir /sys/kernel/config/target/srpt/* >&/dev/null
     rmdir /sys/kernel/config/target/srpt >&/dev/null
 
-    if [ -e /sys/module/ib_srpt ]; then
-	modprobe -r ib_srpt || return $?
-    fi
+    unload_module ib_srpt || return $?
 
     rmdir /sys/kernel/config/target/core/*/* >&/dev/null
     rmdir /sys/kernel/config/target/core/* >&/dev/null
@@ -276,9 +281,7 @@ stop_lio_srpt() {
     for m in ib_srpt target_core_pscsi target_core_iblock target_core_file \
 		     target_core_stgt target_core_user target_core_mod
     do
-	if [ -e /sys/module/$m ]; then
-	    modprobe -r $m || return $?
-	fi
+	unload_module $m || return $?
     done
 }
 
@@ -292,7 +295,7 @@ start_srpt() {
 # Unload the SRP target driver.
 stop_srpt() {
     stop_lio_srpt || return $?
-    modprobe -r brd || return $?
+    unload_module brd || return $?
     rm -f "${vdev_path[@]}"
     echo "Unloaded the ib_srpt kernel module"
 }
