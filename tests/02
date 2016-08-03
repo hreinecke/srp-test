@@ -19,11 +19,6 @@
 # shellcheck source=lib/functions
 . "$(dirname "$0")/../lib/functions"
 
-usage() {
-    echo "Usage: $1 [-d] [-f <filesystem type>]"
-    exit 1
-}
-
 disconnect_srp_loop() {
     while :; do
 	sleep 5
@@ -57,19 +52,6 @@ test_disconnect_repeatedly() {
        unmount_and_check "$m" || return $?
     fi
     return $fio_status
-}
-
-parse_cmdline() {
-    while [ "${1#-}" != "$1" ]; do
-	case "${1#-}" in
-	    d) debug=1;;
-	    f) filesystem_type=$2; shift;;
-	    *) usage "$(dirname "$0")";;
-	esac
-	shift
-    done
-
-    [ $# = 0 ] || usage "$(dirname "$0")"
 }
 
 parse_cmdline "$@" &&

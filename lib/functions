@@ -20,7 +20,31 @@ vdev_path=(/dev/ram0 /dev/ram1)
 scsi_serial=(ramdisk1 ramdisk2)
 mountpoint=("$PWD/mnt1" "$PWD/mnt2")
 ramdisk_size=$((1<<30)) # 1 GiB
-filesystem_type=
+options=()
+debug=
+filesystem_type=xfs
+target_framework=lio
+tests=()
+
+usage() {
+    echo "Usage: $1 [-d] [-f <filesystem type>] [-s] [-t <test>]*"
+    exit 1
+}
+
+parse_cmdline() {
+    while [ "${1#-}" != "$1" ]; do
+	case "${1#-}" in
+	    d) options+=($1);    debug=1;;
+	    f) options+=($1 $2); filesystem_type=$2; shift;;
+	    s) options+=($1);    target_framework=scst;;
+	    t) options+=($1 $2); tests+=($2); shift;;
+	    *) usage "$(dirname "$0")";;
+	esac
+	shift
+    done
+
+    [ $# = 0 ] || usage "$(dirname "$0")"
+}
 
 # Make the SRP initiator driver log in to each SRP target port.
 srp_log_in() {
@@ -181,8 +205,18 @@ lio_scsi_mpath_id() {
     echo "36001405$hs"
 }
 
+scst_scsi_mpath_id() {
+    local i=$1
+
+    echo "2$(echo -n "${scsi_serial[$i]}" | od -tx1 -N8 | sed 's/^[0-9]*[[:blank:]]*//;s/[[:blank:]]//g')"
+}
+
 scsi_mpath_id() {
-    lio_scsi_mpath_id "$@"
+    case "$target_framework" in
+	lio)  lio_scsi_mpath_id "$@";;
+	scst) scst_scsi_mpath_id "$@";;
+	*)    false;;
+    esac || return $?
 }
 
 # Load LIO and configure the SRP target driver and LUNs
@@ -285,16 +319,98 @@ stop_lio_srpt() {
     done
 }
 
+# Associate the SCST device with name $2 with handler $1, file $3 and SCSI
+# serial $4.
+configure_scst_vdev() {
+    local handler=$1 scst_dev=$2 path=$3 serial=$4
+
+    (
+	cd "/sys/kernel/scst_tgt/handlers/$handler" &&
+	    echo "add_device $scst_dev filename=$path" >mgmt &&
+	    cd "$scst_dev" &&
+	    echo "$serial" >t10_dev_id
+    )
+}
+
+# Load the SCST SRP target driver.
+start_scst_srpt() {
+    local b d hca i m p r vdev
+
+    hca=($(cat /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
+
+    modprobe scst_vdisk || return $?
+    insmod "/lib/modules/$(uname -r)/extra/ib_srpt.ko" srp_max_req_size=4200 dyndbg=+pmf || return $?
+    for r in "${vdev_path[@]}"; do
+	if [ -b "$r" ]; then
+	    oflag=oflag=direct
+	else
+	    oflag=
+	fi
+	dd if=/dev/zero of="${r}" bs=1M count=$((ramdisk_size>>20)) ${oflag} >/dev/null 2>&1 || return $?
+	mkdir -p "${mountpoint[i]}"
+	((i++))
+    done
+    (
+	cd /sys/kernel/scst_tgt/handlers/vdisk_nullio &&
+	    echo add_device dummy dummy=1 >mgmt
+    ) || return $?
+    vdev=(vdisk_blockio/vdev0 vdisk_blockio/vdev1)
+    for ((i=0; i < ${#vdev[@]}; i++)); do
+	d="$(dirname "${vdev[i]}")"
+	b="$(basename "${vdev[i]}")"
+	configure_scst_vdev "$d" "$b" "${vdev_path[i]}" "${scsi_serial[i]}" ||
+	    return $?
+    done
+    (
+	cd /sys/kernel/scst_tgt/targets/ib_srpt || exit $?
+	for h in "${hca[@]}"; do
+	    echo "add dummy 0" >"$h/luns/mgmt" || exit $?
+	    (
+		cd "$h/ini_groups" &&
+		    echo "create all" >mgmt &&
+		    cd all
+	    ) || exit $?
+	    i=0
+	    for v in "${vdev[@]}"; do
+		d="$(dirname "${vdev[i]}")"
+		b="$(basename "${vdev[i]}")"
+		echo "add $b $i" >"$h/ini_groups/all/luns/mgmt" || exit $?
+		i=$((i+1))
+	    done
+	    echo "add $h" >"$h/ini_groups/all/initiators/mgmt" || exit $?
+	    echo 1 >"$h/enabled" || exit $?
+	done
+    ) || return $?
+}
+
+# Unload the SCST SRP target driver.
+stop_scst_srpt() {
+    local rc=0 m
+
+    for m in ib_srpt scst_vdisk scst; do
+	unload_module "$m" || rc=$?
+    done
+    return $rc
+}
+
 # Load and configure the SRP target driver
 start_srpt() {
     modprobe brd rd_nr=${#vdev_path[@]} rd_size=$((ramdisk_size>>10))
-    start_lio_srpt || return $?
+    case "$target_framework" in
+	lio)  start_lio_srpt;;
+	scst) start_scst_srpt;;
+	*)    false;;
+    esac || return $?
     echo "Configured SRP target driver"
 }
 
 # Unload the SRP target driver.
 stop_srpt() {
-    stop_lio_srpt || return $?
+    case "$target_framework" in
+	lio)  stop_lio_srpt;;
+	scst) stop_scst_srpt;;
+	*)    false;;
+    esac || return $?
     unload_module brd || return $?
     rm -f "${vdev_path[@]}"
     echo "Unloaded the ib_srpt kernel module"
@@ -343,3 +459,6 @@ unmount_and_check() {
 	return 1
     fi
 }
+
+# To suppress a shellcheck warning
+[ -n "$debug" ]

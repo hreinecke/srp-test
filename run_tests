@@ -17,30 +17,9 @@
 # Foundation, Inc.
 
 scriptdir=$(dirname "$0")
-tests=()
-filesystem_type=xfs
 
 # shellcheck source=lib/functions
 . "$scriptdir/lib/functions"
-
-usage() {
-    echo "Usage: $1 [-d] [-f <filesystem type>] [-t <test>]*"
-    exit 1
-}
-
-parse_cmdline() {
-    while [ "${1#-}" != "$1" ]; do
-	case "${1#-}" in
-	    d) debug=1;;
-	    f) filesystem_type=$2; shift;;
-	    t) tests+=($2); shift;;
-	    *) usage "$(dirname "$0")";;
-	esac
-	shift
-    done
-
-    [ $# = 0 ] || usage "$(dirname "$0")"
-}
 
 # Verify whether all required software has been installed
 pre_check() {
@@ -89,15 +68,8 @@ teardown() {
 
 # Run the actual SRP tests
 run_tests() {
-    local success=0 failure=0 i opts t
+    local success=0 failure=0 i t
 
-    opts=()
-    if [ -n "$debug" ]; then
-	opts+=(-d)
-    fi
-    if [ -n "$filesystem_type" ]; then
-	opts+=(-f "$filesystem_type")
-    fi
     if [ ${#tests[@]} = 0 ]; then
 	for t in "$scriptdir/tests"/*; do
 	    tests+=("$t")
@@ -110,7 +82,7 @@ run_tests() {
     for t in "${tests[@]}"; do
 	[ "${t%\~}" != "$t" ] && continue
 	echo "Running test $t ..."
-	if "$t" "${opts[@]}"; then
+	if "$t" "${options[@]}"; then
 	    echo "Test $t succeeded"
 	    ((success++))
 	else
@@ -123,8 +95,6 @@ run_tests() {
     done
     echo "$success tests succeeded and $failure tests failed"
 }
-
-debug=
 
 parse_cmdline "$@" &&
     pre_check &&
