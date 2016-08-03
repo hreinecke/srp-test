@@ -34,6 +34,7 @@ test_disconnect_repeatedly() {
     echo "Test I/O on top of multipath concurrently with logout and login (10 min)"
     srp_log_in ""
     dev="/dev/disk/by-id/dm-uuid-mpath-$(scsi_mpath_id 0)"
+    echo "Using $dev -> $(readlink "$dev")"
     m=${mountpoint[0]}
     unmount_and_check "$m" || return $?
     create_filesystem "$dev" || return $?
