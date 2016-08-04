@@ -29,7 +29,7 @@ test_large_transfer_size() {
     fio --verify=md5 -rw=randwrite --size=16M --bs=4M --loops=$((10**6)) \
 	--iodepth=4 --group_reporting --sync=1 --direct=1 --ioengine=libaio \
 	--filename="$dev" --name=large-io-test --thread --numjobs=1 \
-	--runtime=10 --output=fio-output-03.txt >/dev/null
+	--runtime=10 --exitall_on_error=1 --output=fio-output-03.txt >/dev/null
 }
 
 test_large_transfer_size
