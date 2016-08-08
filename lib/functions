@@ -22,7 +22,7 @@ mountpoint=("$PWD/mnt1" "$PWD/mnt2")
 ramdisk_size=$((1<<30)) # 1 GiB
 options=()
 debug=
-filesystem_type=xfs
+filesystem_type=ext4
 target_framework=lio
 tests=()
 
