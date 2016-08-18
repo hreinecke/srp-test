@@ -116,7 +116,7 @@ remove_srp_mpath_devs() {
 	    mpdev="/dev/mapper/$mpdev"
 	    echo -n "removing $mpdev: "
 	    dmsetup message "$mpdev" 0 fail_if_no_path
-	    for ((i=10;i>=0;i--)); do
+	    for ((i=10;i>0;i--)); do
 		if dmsetup remove "$mpdev" >/dev/null 2>&1; then
 		    echo "done"
 		    break
