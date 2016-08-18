@@ -139,7 +139,7 @@ unload_module() {
 # Load the SRP initiator driver with kernel module parameters $1..$n.
 start_srp() {
     modprobe scsi_transport_srp
-    modprobe ib_srp "$*" || return $?
+    modprobe ib_srp "$@" || return $?
 }
 
 # Unload the SRP initiator driver.
