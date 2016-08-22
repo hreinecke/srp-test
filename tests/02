@@ -31,7 +31,7 @@ disconnect_srp_loop() {
 test_disconnect_repeatedly() {
     local dev fio_status m pid
 
-    echo "Test I/O on top of multipath concurrently with logout and login (10 min)"
+    echo "Test file I/O on top of multipath concurrently with logout and login (10 min)"
     srp_log_in ""
     dev="/dev/disk/by-id/dm-uuid-mpath-$(scsi_mpath_id 0)"
     echo "Using $dev -> $(readlink "$dev" 2>/dev/null || echo "?")"
