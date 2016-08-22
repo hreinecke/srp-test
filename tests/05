@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# Copyright (c) 2016 Western Digital Corporation or its affiliates
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc.
+
+# shellcheck source=lib/functions
+. "$(dirname "$0")/../lib/functions"
+
+disconnect_srp_loop() {
+    while :; do
+	sleep 5
+	srp_log_out
+	sleep 5
+	srp_log_in ""
+    done
+}
+
+test_disconnect_repeatedly() {
+    local dev fio_status m pid
+
+    echo "Test block I/O on top of multipath concurrently with logout and login (10 min)"
+    srp_log_in ""
+    dev="/dev/disk/by-id/dm-uuid-mpath-$(scsi_mpath_id 0)"
+    echo "Using $dev -> $(readlink "$dev" 2>/dev/null || echo "?")"
+    disconnect_srp_loop &
+    pid=$!
+    fio --verify=md5 -rw=randwrite --bs=4K --loops=10000 --ioengine=libaio \
+	--iodepth=64 --iodepth_batch=32 --group_reporting --sync=1 --direct=1 \
+	--filename="$dev" --name=data-integrity-test --thread --numjobs=1 \
+	--runtime=600 --exitall_on_error=1 --output=fio-output-05.txt >/dev/null
+    fio_status=$?
+    kill $pid
+    wait
+    srp_log_in ""
+    return $fio_status
+}
+
+parse_cmdline "$@" &&
+    test_disconnect_repeatedly
