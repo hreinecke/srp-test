@@ -27,10 +27,10 @@ test_large_transfer_size() {
     srp_log_in "queue_size=32,max_cmd_per_lun=32,max_sect=8192"
     dev="/dev/disk/by-id/dm-uuid-mpath-$(scsi_mpath_id 0)"
     echo "Using $dev -> $(readlink "$dev" 2>/dev/null || echo "?")"
-    fio --verify=md5 -rw=randwrite --size=16M --bs=4M --loops=$((10**6)) \
+    run_fio --verify=md5 -rw=randwrite --size=16M --bs=4M --loops=$((10**6)) \
 	--iodepth=4 --group_reporting --sync=1 --direct=1 --ioengine=libaio \
 	--filename="$dev" --name=large-io-test --thread --numjobs=1 \
-	--runtime=10 --exitall_on_error=1 --output=fio-output-03.txt >/dev/null
+	--runtime=10 --output=fio-output-03.txt >/dev/null
 }
 
 test_large_transfer_size

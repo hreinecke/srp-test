@@ -37,10 +37,10 @@ test_disconnect_repeatedly() {
     echo "Using $dev -> $(readlink "$dev" 2>/dev/null || echo "?")"
     disconnect_srp_loop &
     pid=$!
-    fio --verify=md5 -rw=randwrite --bs=4K --loops=10000 --ioengine=libaio \
+    run_fio --verify=md5 -rw=randwrite --bs=4K --loops=10000 --ioengine=libaio \
 	--iodepth=64 --iodepth_batch=32 --group_reporting --sync=1 --direct=1 \
 	--filename="$dev" --name=data-integrity-test --thread --numjobs=1 \
-	--runtime=600 --exitall_on_error=1 --output=fio-output-05.txt >/dev/null
+	--runtime=600 --output=fio-output-05.txt >/dev/null
     fio_status=$?
     kill $pid
     wait

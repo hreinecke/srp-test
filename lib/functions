@@ -462,5 +462,23 @@ unmount_and_check() {
     fi
 }
 
+# Test whether fio supports command-line options "$@"
+test_fio_opt() {
+    ! fio --name=arg-test --filename=/dev/null "$@" 2>&1 |
+	grep -q 'unrecognized option'
+}
+
+run_fio() {
+    local opt args
+
+    args=("$@")
+    for opt in --exitall_on_error=1 --gtod_reduce=1; do
+	if test_fio_opt "$opt"; then
+	    args+=("$opt")
+	fi
+    done
+    fio "${args[@]}"
+}
+
 # To suppress a shellcheck warning
 [ -n "$debug" ]
