@@ -318,6 +318,8 @@ start_srp() {
 
 # Unload the SRP initiator driver.
 stop_srp() {
+    local i
+
     srp_log_out
     remove_srp_mpath_devs || return $?
     for ((i=20;i>=0;i--)); do
