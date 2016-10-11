@@ -41,4 +41,5 @@ count_luns() {
     [ $luns = ${#vdev_path[@]} ]
 }
 
-count_luns
+parse_cmdline "$@" &&
+    count_luns

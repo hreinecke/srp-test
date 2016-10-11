@@ -39,4 +39,5 @@ test_low_sg_size() {
 	--runtime=10 --output=fio-output-04.txt >/dev/null
 }
 
-test_low_sg_size
+parse_cmdline "$@" &&
+    test_low_sg_size

@@ -37,4 +37,5 @@ test_large_transfer_size() {
 	--runtime=10 --output=fio-output-03.txt >/dev/null
 }
 
-test_large_transfer_size
+parse_cmdline "$@" &&
+    test_large_transfer_size
