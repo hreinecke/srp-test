@@ -28,7 +28,7 @@ Running the Tests
 
     devices {
         device {
-            vendor       "LIO-ORG|SCST_BIO"
+            vendor       "LIO-ORG|SCST_BIO|FUSIONIO"
             product      ".*"
             features     "1 queue_if_no_path"
             path_checker tur
