@@ -34,8 +34,6 @@ pre_check() {
 
 # Set up test configuration
 setup() {
-    local p
-
     if ! pidof multipathd >/dev/null; then
 	echo "Error: multipathd is not running"
 	return 1
