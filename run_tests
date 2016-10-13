@@ -45,23 +45,23 @@ setup() {
 	return 1
     fi
 
-    stop_srp || return $?
-
-    stop_srpt || return $?
+    teardown || return $?
 
     for m in ; do
         echo module $m +pmf >/sys/kernel/debug/dynamic_debug/control
     done
 
-    start_srpt || return $?
+    start_target || return $?
 
-    start_srp ch_count=2
+    start_client ""
 }
 
 # Undo setup()
 teardown() {
-    stop_srp
-    stop_srpt
+    remove_mpath_devs &&
+    log_out &&
+    stop_client &&
+    stop_target
 }
 
 # Run the actual SRP tests

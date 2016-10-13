@@ -1,0 +1,9 @@
+#!/bin/bash
+
+if [ "${1#nvme}" != "$1" ]; then
+    wwid=$(<"/sys/block/$1/wwid")
+    wwid=${wwid#nvme.0000-}
+    echo "${wwid%-4c696e75780000000000000000000000000000000000000000000000000000000000000000000000-00000001}"
+else
+    /usr/lib/udev/scsi_id --whitelisted "/dev/$1"
+fi

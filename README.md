@@ -26,6 +26,11 @@ Running the Tests
 
 <span></span>
 
+    defaults {
+        user_friendly_names     yes
+        queue_without_daemon    no
+        getuid_callout          "/.../srp-test/bin/getuid_callout %n"
+    }
     devices {
         device {
             vendor       "LIO-ORG|SCST_BIO|FUSIONIO"
@@ -33,6 +38,10 @@ Running the Tests
             features     "1 queue_if_no_path"
             path_checker tur
         }
+    }
+    blacklist_exceptions {
+        property        ".*"
+        devnode         "^nvme"
     }
 
 * Run `echo reconfigure | multipathd -k` if multipathd has already been started.

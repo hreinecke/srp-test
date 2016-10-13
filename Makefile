@@ -14,6 +14,7 @@ README.html: README.md
 	} >"$@"
 
 shellcheck:
-	shellcheck -x -f gcc run_tests lib/functions tests/*[^~]
+	shellcheck -x -f gcc run_tests bin/getuid_callout lib/functions \
+	tests/*[^~]
 
 .PHONY: discontiguous-io/discontiguous-io shellcheck

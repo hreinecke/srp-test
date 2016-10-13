@@ -22,9 +22,9 @@
 disconnect_srp_loop() {
     while :; do
 	sleep 5
-	srp_log_out
+	log_out
 	sleep 5
-	srp_log_in ""
+	log_in ""
     done
 }
 
@@ -32,7 +32,7 @@ test_disconnect_repeatedly() {
     local dev fio_status m pid
 
     echo "Test file I/O on top of multipath concurrently with logout and login (10 min)"
-    srp_log_in ""
+    log_in ""
     dev=$(get_bdev 0) || return $?
     m=${mountpoint[0]}
     unmount_and_check "$m" || return $?
@@ -47,7 +47,7 @@ test_disconnect_repeatedly() {
     fio_status=$?
     kill $pid
     wait
-    srp_log_in ""
+    log_in ""
     if [ $fio_status = 0 ] && [ ! -n "$debug" ]; then
        unmount_and_check "$m" || return $?
     fi

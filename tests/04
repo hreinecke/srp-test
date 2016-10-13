@@ -23,10 +23,10 @@ test_low_sg_size() {
     local dev m
 
     echo "Test large transfer sizes"
-    srp_log_out
-    stop_srp
-    start_srp ch_count=1 cmd_sg_entries=1
-    srp_log_in ""
+    log_out
+    stop_client
+    start_client "srp_params=ch_count=1 cmd_sg_entries=1"
+    log_in ""
     dev=$(get_bdev 0) || return $?
     run_fio --verify=md5 -rw=randwrite --size=16M --bs=4M --loops=$((10**6)) \
 	--iodepth=4 --group_reporting --sync=1 --direct=1 --ioengine=libaio \
