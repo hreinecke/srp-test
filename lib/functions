@@ -81,6 +81,10 @@ srp_log_out() {
     wait
 }
 
+is_number() {
+    [ "$1" -eq "0$1" ] 2>/dev/null
+}
+
 remove_srp_mpath_devs() {
     (
 	cd /sys/class/scsi_host &&
@@ -195,6 +199,7 @@ configure_lio_vdev() {
 lio_scsi_mpath_id() {
     local i=$1 hs
 
+    is_number "$i" || return $?
     hs=$(echo -n "${scsi_serial[i]}" | od -v -tx1 -w99 |
 		{ read -r offset bytes;
 		  echo "${bytes// }";
@@ -210,6 +215,7 @@ lio_scsi_mpath_id() {
 scst_scsi_mpath_id() {
     local i=$1
 
+    is_number "$i" || return $?
     echo "2$(echo -n "${scsi_serial[$i]}" | od -tx1 -N8 | sed 's/^[0-9]*[[:blank:]]*//;s/[[:blank:]]//g')"
 }
 
