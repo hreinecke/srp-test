@@ -227,6 +227,21 @@ scsi_mpath_id() {
     esac || return $?
 }
 
+# Get a /dev/... path that points at dm device number $1 with $1 >= 0.
+get_bdev() {
+    local dev i=$1
+
+    is_number "$i" || return $?
+    dev="/dev/disk/by-id/dm-uuid-mpath-$(scsi_mpath_id "$i")"
+    if [ -L "$dev" ]; then
+	echo "Using $dev -> $(readlink "$dev" 2>/dev/null || echo "?")" >&2
+    else
+	echo "$dev: not a soft link" >&2
+	return 1
+    fi
+    echo "$dev"
+}
+
 # Load LIO and configure the SRP target driver and LUNs
 start_lio_srpt() {
     local b d hca i m p r rdma_port vdev
