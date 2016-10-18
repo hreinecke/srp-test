@@ -162,6 +162,39 @@ log_out() {
     fi
 }
 
+held_by() {
+    local d e dev=$1
+
+    while [ -L "$dev" ]; do
+	dev=$(realpath "$dev")
+    done
+    dev=${dev%/dev/}
+    for d in /sys/class/block/*/holders/*; do
+	[ -e "$d" ] || continue
+	e=$(basename "$d")
+	if [ "$e" = "$dev" ]; then
+	    echo "/dev/$(basename "$(dirname "$(dirname "$d")")")"
+	fi
+    done
+}
+
+simulate_network_failure_loop() {
+    local d
+
+    while :; do
+	sleep 5
+	if [ -n "$nvme" ]; then
+	    for d in $(held_by "$dev"); do
+		echo 1 >"$d/device/reset_controller"
+	    done
+	else
+	    log_out
+	    sleep 5
+	    log_in ""
+	fi
+    done
+}
+
 remove_srp_mpath_devs() {
     (
 	cd /sys/class/scsi_host &&

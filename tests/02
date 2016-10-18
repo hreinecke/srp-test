@@ -19,15 +19,6 @@
 # shellcheck source=lib/functions
 . "$(dirname "$0")/../lib/functions"
 
-disconnect_srp_loop() {
-    while :; do
-	sleep 5
-	log_out
-	sleep 5
-	log_in ""
-    done
-}
-
 test_disconnect_repeatedly() {
     local dev fio_status m pid
 
@@ -38,7 +29,7 @@ test_disconnect_repeatedly() {
     unmount_and_check "$m" || return $?
     create_filesystem "$dev" || return $?
     mount_and_check "$dev" "$m" || return $?
-    disconnect_srp_loop &
+    simulate_network_failure_loop "$dev" &
     pid=$!
     run_fio --verify=md5 -rw=randwrite --size=10M --bs=4K --loops=$((10**6)) \
 	--iodepth=64 --group_reporting --sync=1 --direct=1 --ioengine=libaio \
@@ -47,7 +38,7 @@ test_disconnect_repeatedly() {
     fio_status=$?
     kill $pid
     wait
-    log_in ""
+    [ -z "$nvme" ] && log_in ""
     if [ $fio_status = 0 ] && [ ! -n "$debug" ]; then
        unmount_and_check "$m" || return $?
     fi
