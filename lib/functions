@@ -49,6 +49,15 @@ parse_cmdline() {
     [ $# = 0 ] || usage "$(dirname "$0")"
 }
 
+use_blk_mq() {
+    local dm_mode=$1 scsi_mode=$2
+
+    echo "$dm_mode"   > "/sys/module/dm_mod/parameters/use_blk_mq"   ||
+	return $?
+    echo "$scsi_mode" > "/sys/module/scsi_mod/parameters/use_blk_mq" ||
+	return $?
+}
+
 # Make the SRP initiator driver log in to each SRP target port.
 srp_log_in() {
     local add_param=$1 d guid ibdev port

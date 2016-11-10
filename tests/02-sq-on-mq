@@ -1,0 +1,53 @@
+#!/bin/bash
+#
+# Copyright (c) 2016 Western Digital Corporation or its affiliates
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc.
+
+# shellcheck source=lib/functions
+. "$(dirname "$0")/../lib/functions"
+
+test_disconnect_repeatedly() {
+    local dev fio_status m pid
+
+    echo "Test file I/O on top of multipath concurrently with logout and login (10 min; sq-on-mq)"
+    log_out
+    use_blk_mq n y
+    log_in ""
+    dev=$(get_bdev 0) || return $?
+    m=${mountpoint[0]}
+    unmount_and_check "$m" || return $?
+    create_filesystem "$dev" || return $?
+    mount_and_check "$dev" "$m" || return $?
+    simulate_network_failure_loop "$dev" &
+    pid=$!
+    run_fio --verify=md5 -rw=randwrite --size=10M --bs=4K --loops=$((10**6)) \
+	--iodepth=64 --group_reporting --sync=1 --direct=1 --ioengine=libaio \
+	--directory="$m" --name=data-integrity-test --thread --numjobs=16 \
+	--runtime=600 --output=fio-output-02.txt >/dev/null
+    fio_status=$?
+    kill $pid
+    wait
+    [ -z "$nvme" ] && log_in ""
+    if [ ! -n "$debug" ]; then
+       unmount_and_check "$m" || return $?
+    fi
+    log_out
+    use_blk_mq y y
+    return $fio_status
+}
+
+parse_cmdline "$@" &&
+    test_disconnect_repeatedly
