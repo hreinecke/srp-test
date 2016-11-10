@@ -22,7 +22,7 @@
 test_large_transfer_size() {
     local dev m
 
-    echo "Test large transfer sizes"
+    echo "Test large transfer sizes with cmd_sg_entries=255"
     log_out
     log_in "srp_params=queue_size=32,max_cmd_per_lun=32,max_sect=8192"
     dev=$(get_bdev 0) || return $?

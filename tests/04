@@ -22,7 +22,7 @@
 test_low_sg_size() {
     local dev m
 
-    echo "Test large transfer sizes"
+    echo "Test large transfer sizes with cmd_sg_entries=1"
     log_out
     stop_client
     start_client "srp_params=ch_count=1 cmd_sg_entries=1"
