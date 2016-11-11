@@ -209,7 +209,11 @@ remove_srp_mpath_devs() {
 			[ -e "$h" ] || continue
 			dm=/dev/$(basename "$h")
 			echo -n "SRP LUN $s / $b: removing $dm: "
-			dmsetup remove "$dm" && echo "done"
+			if output=$(dmsetup remove "$dm" 2>&1); then
+			    echo "done"
+			else
+			    echo "$output; retrying"
+			fi
 		    done
 		done
 	    done
