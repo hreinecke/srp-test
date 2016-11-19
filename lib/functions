@@ -627,6 +627,9 @@ stop_scst_srpt() {
 # Load and configure the SRP target driver
 start_srpt() {
     modprobe brd rd_nr=${#vdev_path[@]} rd_size=$((ramdisk_size>>10))
+    modprobe ib_uverbs
+    modprobe ib_umad
+    modprobe rdma_cm
     case "$target_framework" in
 	lio)  start_lio_srpt;;
 	scst) start_scst_srpt;;
