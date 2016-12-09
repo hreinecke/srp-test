@@ -450,13 +450,68 @@ get_bdev() {
     echo "$dev"
 }
 
+# Configure zero or more target ports such that these accept connections from
+# zero or more initiator ports. Target and initiator port lists are separated
+# by "--".
+configure_target_ports() {
+    local i ini initiators target_port target_ports
+
+    target_ports=()
+    while [ $# -gt 0 ]; do
+	if [ "$1" = "--" ]; then
+	    shift
+	    break
+	fi
+	target_ports+=("$1")
+	shift
+    done
+
+    initiators=()
+    while [ $# -gt 0 ]; do
+	initiators+=("$1")
+	shift
+    done
+
+    for target_port in "${target_ports[@]}"; do
+	mkdir "$target_port" || exit $?
+	[ -e "$target_port" ] || continue
+	#echo "$target_port"
+	mkdir "$target_port/$target_port" || continue
+	i=0
+	for v in "${vdev[@]}"; do
+	    mkdir "$target_port/$target_port/lun/lun_$i" || exit $?
+	    (
+		cd "$target_port/$target_port/lun/lun_$i" &&
+		    ln -s "../../../../../core/$v"
+	    ) || exit $?
+	    i=$((i+1))
+	done
+	for ini in "${initiators[@]}"; do
+	    (
+		cd "$target_port/$target_port/acls" &&
+		    mkdir "${ini}" &&
+		    cd "${ini}" &&
+		    for ((i = 0; i < ${#vdev[@]}; i++)) do
+			(
+			    mkdir lun_$i &&
+				cd lun_$i &&
+				ln -s ../../../lun/lun_$i
+			) || exit $?
+		    done
+	    ) || exit $?
+	    echo 1 >"$target_port/$target_port/enable"
+	done
+    done
+}
+
 # Load LIO and configure the SRP target driver and LUNs
 start_lio_srpt() {
-    local b d hca i m p r rdma_port vdev
+    local b d hca i m p r vdev
 
-    rdma_port=()
-    hca=($(sed 's/^/0x/;s/://g' /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
-    rdma_port=($(sed 's/^fe8/0x000/;s/://g' /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
+    target_guids=($(sed 's/^fe80:0000:0000:0000://' /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
+    target_gids=($(sed 's/^/0x/;s/://g' /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
+    ini_guids=($(sed 's/^fe80:0000:0000:0000://' /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
+    ini_gids=($(sed 's/^fe8/0x000/;s/://g' /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
     mount_configfs || return $?
     modprobe target_core_mod || return $?
     modprobe target_core_iblock || return $?
@@ -485,36 +540,8 @@ start_lio_srpt() {
 	cd /sys/kernel/config/target || exit $?
 	mkdir srpt || exit $?
 	cd srpt || exit $?
-	for hca in "${hca[@]}"; do
-	    mkdir "$hca" || exit $?
-	    [ -e "$hca" ] || continue
-	    #echo "$hca"
-	    mkdir "$hca/$hca" || exit $?
-	    i=0
-	    for v in "${vdev[@]}"; do
-		mkdir "$hca/$hca/lun/lun_$i" || exit $?
-		(
-		    cd "$hca/$hca/lun/lun_$i" &&
-			ln -s "../../../../../core/$v"
-		) || exit $?
-		i=$((i+1))
-	    done
-	    for p in "${rdma_port[@]}"; do
-		(
-		    cd "$hca/$hca/acls" &&
-			mkdir "${p}" &&
-			cd "${p}" &&
-			for ((i = 0; i < ${#vdev[@]}; i++)) do
-			    (
-				mkdir lun_$i &&
-				    cd lun_$i &&
-				    ln -s ../../../lun/lun_$i
-			    ) || exit $?
-			done
-		) || exit $?
-		echo 1 >"$hca/$hca/enable"
-	    done
-	done
+	configure_target_ports "${target_guids[@]}" -- "${ini_guids[@]}" ||
+	    configure_target_ports "${target_gids[@]}" -- "${ini_gids[@]}"
     )
 }
 
