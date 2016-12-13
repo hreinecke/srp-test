@@ -679,7 +679,7 @@ stop_srpt() {
 
 get_ipv4_addr() {
     ifconfig "$1" 2>/dev/null |
-	sed -n 's/^[[:blank:]]*inet addr:[[:blank:]]*\([^[:blank:]]*\).*/\1/p'
+	sed -n 's/^[[:blank:]]*inet\( addr:\|\) \([^[:blank:]]*\).*/\2/p'
 }
 
 configure_nvmet_port() {
