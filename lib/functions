@@ -61,24 +61,22 @@ use_blk_mq() {
 
 # Make the SRP initiator driver log in to each SRP target port.
 srp_log_in() {
-    local add_param=$1 d guid ibdev port
+    local add_param=$1 d gid ibdev ioc_guid port
 
-    for d in /dev/infiniband/umad*; do
+    ioc_guid=$(</sys/module/ib_srpt/parameters/srpt_service_guid)
+    for d in /sys/class/infiniband_mad/umad*; do
+	[ -e "$d" ] || continue
 	sysfsdir=/sys/class/infiniband_mad/$(basename "$d")
 	ibdev=$(<"$sysfsdir/ibdev")
 	port=$(<"$sysfsdir/port")
-	guid=$(<"/sys/class/infiniband/$ibdev/ports/$port/gids/0")
-	guid=${guid//:}
-	ibsrpdm -c -d "$d" |
-	    grep "dgid=$guid" |
-	    while read -r line; do
-		for p in /sys/class/infiniband_srp/*; do
-		    [ -e "$p" ] || continue
-		    {
-			echo "$line,$add_param" >"$p/add_target"
-		    } 2>/dev/null
-		done
-	    done
+	gid=$(<"/sys/class/infiniband/$ibdev/ports/$port/gids/0")
+	gid=${gid//:}
+	for p in /sys/class/infiniband_srp/*; do
+	    [ -e "$p" ] || continue
+	    {
+		echo "id_ext=$ioc_guid,ioc_guid=$ioc_guid,dgid=$gid,pkey=7fff,service_id=$ioc_guid,$add_param" >"$p/add_target"
+	    } 2>/dev/null
+	done
     done
 }
 
