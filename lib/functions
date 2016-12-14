@@ -19,7 +19,8 @@
 vdev_path=(/dev/ram0 /dev/ram1)
 scsi_serial=(ramdisk1 ramdisk2)
 mountpoint=("$PWD/mnt1" "$PWD/mnt2")
-ramdisk_size=$((1<<30)) # 1 GiB
+memtotal=$(sed -n 's/^MemTotal:[[:blank:]]*\([0-9]*\)[[:blank:]]*kB$/\1/p' /proc/meminfo)
+ramdisk_size=$((memtotal*(1024/16)))  # in bytes
 options=()
 debug=
 filesystem_type=ext4
@@ -814,9 +815,20 @@ test_fio_opt() {
 }
 
 run_fio() {
-    local opt args
+    local a d j opt args
 
     args=("$@")
+    j=1
+    for opt in "${args[@]}"; do
+	case "$opt" in
+	    --directory=*) d="${opt#--directory=}";;
+	    --numjobs=*)   j="${opt#--numjobs=}";;
+	esac
+    done
+    if [ -n "$d" ]; then
+	a=$(df --output=avail "$d" | tail -n1)
+	args+=(--size=$((a*1024/j - 16*1024)))
+    fi
     for opt in --exitall_on_error=1 --gtod_reduce=1; do
 	if test_fio_opt "$opt"; then
 	    args+=("$opt")

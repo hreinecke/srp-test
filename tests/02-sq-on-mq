@@ -33,9 +33,9 @@ test_disconnect_repeatedly() {
     mount_and_check "$dev" "$m" || return $?
     simulate_network_failure_loop "$dev" &
     pid=$!
-    run_fio --verify=md5 -rw=randwrite --size=10M --bs=4K --loops=$((10**6)) \
+    run_fio --verify=md5 -rw=randwrite --bs=4K --loops=$((10**6)) \
 	--iodepth=64 --group_reporting --sync=1 --direct=1 --ioengine=libaio \
-	--directory="$m" --name=data-integrity-test --thread --numjobs=16 \
+	--directory="$m" --name=data-integrity-test-02-sq-on-mq --thread --numjobs=16 \
 	--runtime=600 --output=fio-output-02.txt >/dev/null
     fio_status=$?
     kill $pid
