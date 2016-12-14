@@ -473,17 +473,17 @@ configure_target_ports() {
     done
 
     for target_port in "${target_ports[@]}"; do
-	mkdir "$target_port" || exit $?
+	mkdir "$target_port" || return $?
 	[ -e "$target_port" ] || continue
 	#echo "$target_port"
 	mkdir "$target_port/$target_port" || continue
 	i=0
 	for v in "${vdev[@]}"; do
-	    mkdir "$target_port/$target_port/lun/lun_$i" || exit $?
+	    mkdir "$target_port/$target_port/lun/lun_$i" || return $?
 	    (
 		cd "$target_port/$target_port/lun/lun_$i" &&
 		    ln -s "../../../../../core/$v"
-	    ) || exit $?
+	    ) || return $?
 	    i=$((i+1))
 	done
 	for ini in "${initiators[@]}"; do
@@ -496,9 +496,9 @@ configure_target_ports() {
 			    mkdir lun_$i &&
 				cd lun_$i &&
 				ln -s ../../../lun/lun_$i
-			) || exit $?
+			) || return $?
 		    done
-	    ) || exit $?
+	    ) || return $?
 	    echo 1 >"$target_port/$target_port/enable"
 	done
     done
@@ -537,9 +537,9 @@ start_lio_srpt() {
 	    return $?
     done
     (
-	cd /sys/kernel/config/target || exit $?
-	mkdir srpt || exit $?
-	cd srpt || exit $?
+	cd /sys/kernel/config/target || return $?
+	mkdir srpt || return $?
+	cd srpt || return $?
 	configure_target_ports "${target_guids[@]}" -- "${ini_guids[@]}" ||
 	    configure_target_ports "${target_gids[@]}" -- "${ini_gids[@]}"
     )
@@ -620,23 +620,23 @@ start_scst_srpt() {
 	    return $?
     done
     (
-	cd /sys/kernel/scst_tgt/targets/ib_srpt || exit $?
+	cd /sys/kernel/scst_tgt/targets/ib_srpt || return $?
 	for h in "${hca[@]}"; do
-	    echo "add dummy 0" >"$h/luns/mgmt" || exit $?
+	    echo "add dummy 0" >"$h/luns/mgmt" || return $?
 	    (
 		cd "$h/ini_groups" &&
 		    echo "create all" >mgmt &&
 		    cd all
-	    ) || exit $?
+	    ) || return $?
 	    i=0
 	    for v in "${vdev[@]}"; do
 		d="$(dirname "${vdev[i]}")"
 		b="$(basename "${vdev[i]}")"
-		echo "add $b $i" >"$h/ini_groups/all/luns/mgmt" || exit $?
+		echo "add $b $i" >"$h/ini_groups/all/luns/mgmt" || return $?
 		i=$((i+1))
 	    done
-	    echo "add $h" >"$h/ini_groups/all/initiators/mgmt" || exit $?
-	    echo 1 >"$h/enabled" || exit $?
+	    echo "add $h" >"$h/ini_groups/all/initiators/mgmt" || return $?
+	    echo 1 >"$h/enabled" || return $?
 	done
     ) || return $?
 }
