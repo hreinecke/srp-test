@@ -5,5 +5,8 @@ if [ "${1#nvme}" != "$1" ]; then
     wwid=${wwid#nvme.0000-}
     echo "${wwid%-4c696e75780000000000000000000000000000000000000000000000000000000000000000000000-00000001}"
 else
-    /usr/lib/udev/scsi_id --whitelisted "/dev/$1"
+    for e in /usr/lib/udev/scsi_id /lib/udev/scsi_id; do
+	[ -e "$e" ] && break
+    done
+    "$e" --whitelisted "/dev/$1"
 fi
