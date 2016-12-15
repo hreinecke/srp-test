@@ -61,7 +61,7 @@ use_blk_mq() {
 
 # Make the SRP initiator driver log in to each SRP target port.
 srp_log_in() {
-    local add_param=$1 d gid ibdev ioc_guid port
+    local add_param=$1 d dest gid ibdev ioc_guid port
 
     ioc_guid=$(</sys/module/ib_srpt/parameters/srpt_service_guid)
     for d in /sys/class/infiniband_mad/umad*; do
@@ -75,6 +75,17 @@ srp_log_in() {
 	    [ -e "$p" ] || continue
 	    {
 		echo "id_ext=$ioc_guid,ioc_guid=$ioc_guid,dgid=$gid,pkey=7fff,service_id=$ioc_guid,$add_param" >"$p/add_target"
+	    } 2>/dev/null
+	done
+    done
+
+    for d in /sys/class/net/*; do
+	[ -e "$d" ] || continue
+	for p in /sys/class/infiniband_srp/*; do
+	    [ -e "$p" ] || continue
+	    dest="$(get_ipv4_addr "$(basename "$d")"):5555"
+	    {
+		echo "id_ext=$ioc_guid,ioc_guid=$ioc_guid,dest=$dest" >"$p/add_target"
 	    } 2>/dev/null
 	done
     done
@@ -596,7 +607,7 @@ start_scst_srpt() {
     hca=($(cat /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
 
     modprobe scst_vdisk || return $?
-    insmod "/lib/modules/$(uname -r)/extra/ib_srpt.ko" srp_max_req_size=4200 dyndbg=+pmf || return $?
+    insmod "/lib/modules/$(uname -r)/extra/ib_srpt.ko" srp_max_req_size=4200 rdma_cm_port=5555 dyndbg=+pmf || return $?
     for r in "${vdev_path[@]}"; do
 	if [ -b "$r" ]; then
 	    oflag=oflag=direct
@@ -635,6 +646,10 @@ start_scst_srpt() {
 		i=$((i+1))
 	    done
 	    echo "add $h" >"$h/ini_groups/all/initiators/mgmt" || return $?
+	    for d in /sys/class/net/*; do
+		echo "add $(get_ipv4_addr "$(basename "$d")")" \
+		     >"$h/ini_groups/all/initiators/mgmt" || return $?
+	    done
 	    echo 1 >"$h/enabled" || return $?
 	done
     ) || return $?
