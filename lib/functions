@@ -59,6 +59,16 @@ use_blk_mq() {
 	return $?
 }
 
+get_ipv4_addr() {
+    ip -4 -o addr show dev "$1" |
+	sed -n 's/.*[[:blank:]]inet[[:blank:]]*\([^[:blank:]/]*\).*/\1/p'
+}
+
+get_ipv6_addr() {
+    ip -6 -o addr show dev "$1" |
+	sed -n 's/.*[[:blank:]]inet6[[:blank:]]*\([^[:blank:]/]*\).*/\1/p'
+}
+
 # Make the SRP initiator driver log in to each SRP target port.
 srp_log_in() {
     local add_param=$1 d dest gid ibdev ioc_guid port
@@ -689,11 +699,6 @@ stop_srpt() {
     unload_module brd || return $?
     rm -f "${vdev_path[@]}"
     echo "Unloaded the ib_srpt kernel module"
-}
-
-get_ipv4_addr() {
-    ifconfig "$1" 2>/dev/null |
-	sed -n 's/^[[:blank:]]*inet\( addr:\|\) \([^[:blank:]]*\).*/\2/p'
 }
 
 configure_nvmet_port() {
