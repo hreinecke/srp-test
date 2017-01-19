@@ -93,7 +93,9 @@ srp_log_in() {
 	[ -e "$d" ] || continue
 	for p in /sys/class/infiniband_srp/*; do
 	    [ -e "$p" ] || continue
-	    dest="$(get_ipv4_addr "$(basename "$d")"):5555"
+	    a=$(get_ipv4_addr "$(basename "$d")")
+	    [ -n "$a" ] || continue
+	    dest="${a}:5555"
 	    {
 		echo "id_ext=$ioc_guid,ioc_guid=$ioc_guid,dest=$dest" >"$p/add_target"
 	    } 2>/dev/null
@@ -657,8 +659,9 @@ start_scst_srpt() {
 	    done
 	    echo "add $h" >"$h/ini_groups/all/initiators/mgmt" || return $?
 	    for d in /sys/class/net/*; do
-		echo "add $(get_ipv4_addr "$(basename "$d")")" \
-		     >"$h/ini_groups/all/initiators/mgmt" || return $?
+		a=$(get_ipv4_addr "$(basename "$d")")
+		[ -n "$a" ] || continue
+		echo "add $a" >"$h/ini_groups/all/initiators/mgmt" || return $?
 	    done
 	    echo 1 >"$h/enabled" || return $?
 	done
