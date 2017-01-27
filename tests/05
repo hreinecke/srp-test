@@ -22,7 +22,7 @@
 test_disconnect_repeatedly() {
     local dev fio_status m pid
 
-    echo "Test block I/O on top of multipath concurrently with logout and login (10 min)"
+    echo "Test block I/O on top of multipath concurrently with logout and login ($((runtime / 60)) min)"
     log_in ""
     dev=$(get_bdev 0) || return $?
     simulate_network_failure_loop "dev" &
@@ -30,7 +30,7 @@ test_disconnect_repeatedly() {
     run_fio --verify=md5 -rw=randwrite --bs=4K --loops=10000 --ioengine=libaio \
 	--iodepth=64 --iodepth_batch=32 --group_reporting --sync=1 --direct=1 \
 	--filename="$dev" --name=data-integrity-test-05 --thread --numjobs=1 \
-	--runtime=600 --output=fio-output-05.txt >/dev/null
+	--runtime="${runtime}" --output=fio-output-05.txt >/dev/null
     fio_status=$?
     kill $pid
     wait

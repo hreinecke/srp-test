@@ -27,10 +27,11 @@ filesystem_type=ext4
 target_framework=lio
 nvme_subsysnqn="nvme-test"
 nvme_port=7777
+runtime=600
 tests=()
 
 usage() {
-    echo "Usage: $1 [-d] [-f <filesystem type>] [-n] [-s] [-t <test>]*"
+    echo "Usage: $1 [-d] [-f <filesystem type>] [-n] [-r <runtime>] [-s] [-t <test>]*"
     exit 1
 }
 
@@ -40,6 +41,7 @@ parse_cmdline() {
 	    d) options+=($1);    debug=1;;
 	    f) options+=($1 $2); filesystem_type=$2; shift;;
 	    n) options+=($1);    nvme=1;;
+	    r) options+=($1 $2); runtime=$2; shift;;
 	    s) options+=($1);    target_framework=scst;;
 	    t) options+=($1 $2); tests+=($2); shift;;
 	    *) usage "$(dirname "$0")";;
@@ -858,5 +860,5 @@ run_fio() {
     fio "${args[@]}"
 }
 
-# To suppress a shellcheck warning
-[ -n "$debug" ]
+# To suppress shellcheck warnings
+[ -n "$debug" ] && [ -n "$runtime" ]

@@ -22,7 +22,7 @@
 test_disconnect_repeatedly() {
     local dev fio_status m pid
 
-    echo "Test file I/O on top of multipath concurrently with logout and login (10 min; mq)"
+    echo "Test file I/O on top of multipath concurrently with logout and login ($((runtime / 60)) min; mq)"
     log_in ""
     dev=$(get_bdev 0) || return $?
     m=${mountpoint[0]}
@@ -34,7 +34,7 @@ test_disconnect_repeatedly() {
     run_fio --verify=md5 -rw=randwrite --bs=4K --loops=$((10**6)) \
 	--iodepth=64 --group_reporting --sync=1 --direct=1 --ioengine=libaio \
 	--directory="$m" --name=data-integrity-test-mq --thread --numjobs=16 \
-	--runtime=600 --output=fio-output-02-mq.txt >/dev/null
+	--runtime="${runtime}" --output=fio-output-02-mq.txt >/dev/null
     fio_status=$?
     kill $pid
     wait
