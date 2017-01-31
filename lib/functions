@@ -564,8 +564,10 @@ start_lio_srpt() {
 	cd /sys/kernel/config/target || return $?
 	mkdir srpt || return $?
 	cd srpt || return $?
-	configure_target_ports "${target_guids[@]}" -- "${ini_guids[@]}" ||
+	configure_target_ports "${target_guids[@]}" -- "${ini_guids[@]}" || {
+	    echo "Retrying with old port name format"
 	    configure_target_ports "${target_gids[@]}" -- "${ini_gids[@]}"
+	}
     )
 }
 
