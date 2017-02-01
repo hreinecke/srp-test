@@ -457,7 +457,7 @@ get_bdev_uid() {
 
 # Get a /dev/... path that points at dm device number $1 with $1 >= 0.
 get_bdev() {
-    local dev i=$1
+    local dev realdev i=$1
 
     is_number "$i" || return $?
     dev="/dev/disk/by-id/dm-uuid-mpath-$(get_bdev_uid "$i")" || return $?
@@ -465,12 +465,14 @@ get_bdev() {
 	[ -e "$dev" ] && break
 	sleep .1
     done
-    if [ -L "$dev" ]; then
-	echo "Using $dev -> $(readlink "$dev" 2>/dev/null || echo "?")" >&2
-    else
+    if [ ! -L "$dev" ]; then
 	echo "$dev: not a soft link" >&2
 	return 1
     fi
+    realdev=$(readlink "$dev" 2>/dev/null || echo "?")
+    echo "Using $dev -> ${realdev}" >&2
+    #echo mq-deadline > /sys/class/block/$(basename "$realdev")/queue/scheduler
+    echo none > "/sys/class/block/$(basename "$realdev")/queue/scheduler"
     echo "$dev"
 }
 
