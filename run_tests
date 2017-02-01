@@ -53,8 +53,6 @@ setup() {
 
     start_target || return $?
 
-    use_blk_mq y y || return $?
-
     start_client ""
 }
 

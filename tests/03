@@ -23,8 +23,7 @@ test_large_transfer_size() {
     local dev m
 
     echo "Test large transfer sizes with cmd_sg_entries=255"
-    log_out
-    log_in "srp_params=queue_size=32,max_cmd_per_lun=32,max_sect=8192"
+    use_blk_mq y y "srp_params=queue_size=32,max_cmd_per_lun=32,max_sect=8192"
     dev=$(get_bdev 0) || return $?
     run_fio --verify=md5 -rw=randwrite --bs=4M --loops=$((10**6)) \
 	--iodepth=4 --group_reporting --sync=1 --direct=1 --ioengine=libaio \

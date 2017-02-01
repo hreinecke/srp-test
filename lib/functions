@@ -53,12 +53,13 @@ parse_cmdline() {
 }
 
 use_blk_mq() {
-    local dm_mode=$1 scsi_mode=$2
+    local dm_mode=$1 scsi_mode=$2 login_params=$3
 
-    echo "$dm_mode"   > "/sys/module/dm_mod/parameters/use_blk_mq"   ||
-	return $?
-    echo "$scsi_mode" > "/sys/module/scsi_mod/parameters/use_blk_mq" ||
-	return $?
+    log_out &&
+    remove_mpath_devs &&
+    echo "$dm_mode"   > "/sys/module/dm_mod/parameters/use_blk_mq" &&
+    echo "$scsi_mode" > "/sys/module/scsi_mod/parameters/use_blk_mq" &&
+    log_in "$login_params"
 }
 
 get_ipv4_addr() {

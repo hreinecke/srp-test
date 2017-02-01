@@ -54,7 +54,7 @@ count_luns() {
 wait_for_luns() {
     local i luns
 
-    log_in ""
+    use_blk_mq y y
     for ((i=0;i<100;i++)); do
 	luns=$(count_luns)
         [ "$luns" -ge ${#vdev_path[@]} ] && break
