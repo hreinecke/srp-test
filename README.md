@@ -12,8 +12,8 @@ same server, by logging in using the IB loopback functionality and by sending
 I/O through the SRP initiator driver to a RAM disk exported by the SRP target
 driver.
 
-Running the Tests
------------------
+Running the Tests on an IB Setup
+--------------------------------
 
 * If you have configured the kernel yourself, ensure that the ib_srp and
   ib_srpt drivers have been built as kernel modules. Reconfigure, rebuild and
@@ -44,9 +44,57 @@ Running the Tests
         devnode         "^nvme"
     }
 
+* Start multipathd if it is not yet running.
 * Run `echo reconfigure | multipathd -k` if multipathd has already been started.
 * Run `make`.
 * Run `./run_tests`.
 
+Running the Tests on an Ethernet Setup
+--------------------------------------
 
+* Obtain the latest version of rdma_rxe, either by using kernel v4.11 or later
+  or by merging the k.o/for-4.11 branch into your kernel tree of the following
+  repository: https://git.kernel.org/cgit/linux/kernel/git/dledford/rdma.git
+* If you have configured the kernel yourself, ensure that the software RDMA
+  over Ethernet driver (rdma_rxe) driver is enabled. Reconfigure, rebuild and
+  reinstall the kernel and boot the new kernel if necessary.
+* Install the rdma-core software package (building and installing the entire
+  package is not required):
 
+<span></span>
+
+    git clone https://github.com/linux-rdma/rdma-core &&
+    sudo ln -s .../rdma-core/providers/rxe/rxe_cfg /usr/sbin/rxe_cfg
+
+* Install the ib_srp-backport driver:
+
+<span></span>
+
+    git clone https://github.com/bvanassche/ib_srp-backport.git &&
+    cd ib_srp-backport &&
+    make &&
+    sudo make install
+
+* Install SCST:
+
+<span></span>
+
+    git clone https://github.com/bvanassche/scst.git &&
+    cd scst &&
+    make scst srpt &&
+    sudo make -sC scst install &&
+    sudo make -sC srpt install
+
+* Configure at least one SoftRoCE interface, e.g. as follows:
+
+<span></span>
+
+    sudo modprobe rdma_rxe &&
+    sudo rxe_cfg add eth0 &&
+    sudo rxe_cfg &&
+
+* Configure multipathd using the instructions from the previous section.
+* Start multipathd if it is not yet running.
+* Run `echo reconfigure | multipathd -k` if multipathd has already been started.
+* Run `make`.
+* Run `./run_tests -s`.
