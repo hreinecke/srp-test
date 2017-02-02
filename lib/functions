@@ -462,7 +462,7 @@ get_bdev() {
 
     is_number "$i" || return $?
     dev="/dev/disk/by-id/dm-uuid-mpath-$(get_bdev_uid "$i")" || return $?
-    for ((j=0;j<10;j++)); do
+    for ((j=0;j<50;j++)); do
 	[ -e "$dev" ] && break
 	sleep .1
     done
