@@ -470,6 +470,10 @@ get_bdev() {
 	[ -e "$dev" ] && break
 	sleep .1
     done
+    if [ ! -e "$dev" ]; then
+	echo "$dev: not found" >&2
+	return 1
+    fi
     if [ ! -L "$dev" ]; then
 	echo "$dev: not a soft link" >&2
 	return 1
