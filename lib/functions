@@ -829,12 +829,18 @@ create_filesystem() {
     esac
 }
 
+is_mountpoint() {
+    [ -n "$1" ] &&
+    [ "$(block_dev_of_dir "$1")" != \
+      "$(block_dev_of_dir "$(dirname "$1")")" ]
+}
+
 mount_and_check() {
     local dir last
 
     dir=$(for last; do :; done; echo "$last")
     mount "$@"
-    if [ "$(block_dev_of_dir "$dir")" = "$(block_dev_of_dir "$(dirname "$dir")")" ]; then
+    if ! is_mountpoint "$dir"; then
 	echo "Error: mount $* failed"
 	return 1
     fi
@@ -843,8 +849,11 @@ mount_and_check() {
 unmount_and_check() {
     local m=$1
 
-    umount "$m" >/dev/null 2>&1
-    if [ "$(block_dev_of_dir "$m")" != "$(block_dev_of_dir "$(dirname "$m")")" ]; then
+    if is_mountpoint "$m"; then
+	echo "Unmounting $m from $(block_dev_of_dir "$m")"
+        umount "$m"
+    fi
+    if is_mountpoint "$m"; then
 	echo "Error: unmounting $m failed"
 	return 1
     fi
