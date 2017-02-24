@@ -31,7 +31,7 @@ runtime=600
 tests=()
 
 usage() {
-    echo "Usage: $1 [-d] [-f <filesystem type>] [-n] [-r <runtime>] [-s] [-t <test>]*"
+    echo "Usage: $1 [-d] [-f <filesystem type>] [-n] [-r <runtime>] [-s] [-t <test>]* [-x]"
     exit 1
 }
 
@@ -44,6 +44,7 @@ parse_cmdline() {
 	    r) options+=($1 $2); runtime=$2; shift;;
 	    s) options+=($1);    target_framework=scst;;
 	    t) options+=($1 $2); tests+=($2); shift;;
+	    x) options+=($1);    trace=1; shift;;
 	    *) usage "$(dirname "$0")";;
 	esac
 	shift
@@ -905,4 +906,4 @@ run_fio() {
 }
 
 # To suppress shellcheck warnings
-[ -n "$debug" ] && [ -n "$runtime" ]
+[ -n "$debug" ] || [ -n "$runtime" ] || [ -n "$trace" ] || true
