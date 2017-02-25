@@ -29,16 +29,15 @@ pre_check() {
 	    return 1
 	fi
     done
-}
 
-
-# Set up test configuration
-setup() {
     if ! pidof multipathd >/dev/null; then
 	echo "Error: multipathd is not running"
 	return 1
     fi
+}
 
+# Set up test configuration
+setup() {
     /etc/init.d/srpd stop >/dev/null 2>&1
     if pidof srp_daemon >/dev/null; then
 	echo "Error: failed to stop srp_daemon"
@@ -51,17 +50,18 @@ setup() {
         echo module $m +pmf >/sys/kernel/debug/dynamic_debug/control
     done
 
-    start_target || return $?
-
-    start_client ""
+    start_target
 }
 
 # Undo setup()
 teardown() {
+    stop_target
+}
+
+shutdown_client() {
     remove_mpath_devs &&
     log_out &&
-    stop_client &&
-    stop_target
+    stop_client
 }
 
 # Run the actual SRP tests
@@ -80,7 +80,7 @@ run_tests() {
     for t in "${tests[@]}"; do
 	[ "${t%\~}" != "$t" ] && continue
 	echo "Running test $t ..."
-	if "$t" "${options[@]}"; then
+	if start_client "" && "$t" "${options[@]}" && shutdown_client; then
 	    echo "Test $t succeeded"
 	    ((success++))
 	else
