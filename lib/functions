@@ -229,6 +229,36 @@ simulate_network_failure_loop() {
     done
 }
 
+stop_bdev_users() {
+    [ -n "$1" ] || return $?
+    lsof -F p "$1" 2>/dev/null | while read -r line; do
+        p="${line#p}"
+        if [ "$p" != "$line" ]; then
+	    echo -n " (pid $p)"
+	    kill -9 "$p"
+        fi
+    done
+}
+
+remove_mpath_dev() {
+    local dm=$1 i output
+
+    dmsetup message "$dm" 0 fail_if_no_path
+    for ((i=10;i>0;i--)); do
+	if [ ! -e "$dm" ] || output=$(dmsetup remove "$dm" 2>&1); then
+	    echo "done"
+	    break
+	fi
+	echo "$output; retrying"
+	stop_bdev_users "$dm"
+	sleep .1
+    done
+    if [ $i = 0 ]; then
+	echo "failed"
+	return 1
+    fi
+}
+
 remove_srp_mpath_devs() {
     (
 	cd /sys/class/scsi_host &&
@@ -243,12 +273,7 @@ remove_srp_mpath_devs() {
 			[ -e "$h" ] || continue
 			dm=/dev/$(basename "$h")
 			echo -n "SRP LUN $s / $b: removing $dm: "
-			dmsetup message "$dm" 0 fail_if_no_path
-			if output=$(dmsetup remove "$dm" 2>&1); then
-			    echo "done"
-			else
-			    echo "$output; retrying"
-			fi
+			remove_mpath_dev "$dm" || [ -z "$debug" ] || return 1
 		    done
 		done
 	    done
@@ -269,16 +294,7 @@ remove_srp_mpath_devs() {
 	while read -r mpdev; do
 	    mpdev="/dev/mapper/$mpdev"
 	    echo -n "removing $mpdev: "
-	    dmsetup message "$mpdev" 0 fail_if_no_path
-	    for ((i=10;i>0;i--)); do
-		if [ ! -e "$mpdev" ] ||
-		       dmsetup remove "$mpdev" >/dev/null 2>&1; then
-		    echo "done"
-		    break
-		fi
-		sleep .1
-	    done
-	    [ $i = 0 ] && echo "failed"
+	    remove_mpath_dev "$mpdev" || [ -z "$debug" ] || return 1
 	done
     return 0
 }
