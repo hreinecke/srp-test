@@ -534,14 +534,20 @@ configure_target_ports() {
     done
 }
 
+all_primary_gids() {
+    find /sys/devices -name infiniband | while read -r p; do
+        cat "$p"/*/ports/*/gids/0
+    done
+}
+
 # Load LIO and configure the SRP target driver and LUNs
 start_lio_srpt() {
     local b d hca i m p r vdev
 
-    target_guids=($(sed 's/^fe80:0000:0000:0000://' /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
-    target_gids=($(sed 's/^/0x/;s/://g' /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
-    ini_guids=($(sed 's/^fe80:0000:0000:0000://' /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
-    ini_gids=($(sed 's/^fe8/0x000/;s/://g' /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
+    target_guids=($(all_primary_gids | sed 's/^fe80:0000:0000:0000://'))
+    target_gids=($(all_primary_gids | sed 's/^/0x/;s/://g'))
+    ini_guids=($(all_primary_gids | sed 's/^fe80:0000:0000:0000://'))
+    ini_gids=($(all_primary_gids | sed 's/^fe8/0x000/;s/://g'))
     mount_configfs || return $?
     modprobe target_core_mod || return $?
     modprobe target_core_iblock || return $?
@@ -626,7 +632,7 @@ configure_scst_vdev() {
 start_scst_srpt() {
     local b d hca i m p r vdev
 
-    hca=($(cat /sys/devices/*/*/*/infiniband/*/ports/*/gids/0))
+    hca=($(all_primary_gids))
 
     modprobe scst_vdisk || return $?
     insmod "/lib/modules/$(uname -r)/extra/ib_srpt.ko" srp_max_req_size=4200 rdma_cm_port=5555 dyndbg=+pmf || return $?
