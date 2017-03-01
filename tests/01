@@ -29,7 +29,7 @@ count_srp_luns() {
 	for d in /sys/class/scsi_device/$h:*; do
 	    [ -e "$d" ] && ((luns++))
 	done
-	break
+	[ "$luns" -gt 0 ] && break
     done
     echo $luns
 }
