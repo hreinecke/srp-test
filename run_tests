@@ -59,9 +59,11 @@ setup() {
 
     teardown || return $?
 
-    for m in ; do
-        echo module $m +pmf >/sys/kernel/debug/dynamic_debug/control
-    done
+    if [ -d /sys/kernel/debug/dynamic_debug ]; then
+	for m in ; do
+            echo module $m +pmf >/sys/kernel/debug/dynamic_debug/control
+	done
+    fi
 
     start_target
 }

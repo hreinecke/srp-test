@@ -16,11 +16,19 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc.
 
+have_brd() {
+    modinfo brd >/dev/null 2>&1
+}
+
 vdev_path=(/dev/ram0 /dev/ram1)
 scsi_serial=(ramdisk1 ramdisk2)
 mountpoint=("$PWD/mnt1" "$PWD/mnt2")
 memtotal=$(sed -n 's/^MemTotal:[[:blank:]]*\([0-9]*\)[[:blank:]]*kB$/\1/p' /proc/meminfo)
-ramdisk_size=$((memtotal*(1024/16)))  # in bytes
+if have_brd; then
+    ramdisk_size=$((memtotal*(1024/16)))  # in bytes
+else
+    ramdisk_size=$(($(</sys/class/block/ram0/size) * 512))  # in bytes
+fi
 options=()
 debug=
 filesystem_type=ext4
@@ -58,8 +66,10 @@ use_blk_mq() {
 
     log_out &&
     remove_mpath_devs &&
-    echo "$dm_mode"   > "/sys/module/dm_mod/parameters/use_blk_mq" &&
-    echo "$scsi_mode" > "/sys/module/scsi_mod/parameters/use_blk_mq" &&
+    if [ -e /sys/module/dm_mod/parameters/use_blk_mq ]; then
+	echo "$dm_mode"   > /sys/module/dm_mod/parameters/use_blk_mq &&
+	echo "$scsi_mode" > /sys/module/scsi_mod/parameters/use_blk_mq
+    fi &&
     log_in "$login_params"
 }
 
@@ -241,12 +251,39 @@ stop_bdev_users() {
     done
 }
 
-remove_mpath_dev() {
-    local dm=$1 i output
+# RHEL 6 dmsetup only accepts mpath<n> as argument, hence this function.
+dev_to_mpath() {
+    local d e mm
 
+    if [ -h "$1" ]; then
+	e=$(readlink -f "$1")
+    else
+	e="$1"
+    fi
+    mm=$(stat -c %t:%T "$e")
+
+    for d in /dev/mapper/mpath*; do
+	if [ -h "$d" ]; then
+	    e=$(readlink -f "$d")
+	else
+	    e="$d"
+	fi
+	if [ "$(stat -c %t:%T "$e")" = "$mm" ]; then
+	    basename "$d"
+	    return 0
+	fi
+    done
+    return 1
+}
+
+remove_mpath_dev() {
+    local dm i output
+
+    dm=$(dev_to_mpath "$1")
     dmsetup message "$dm" 0 fail_if_no_path
     for ((i=10;i>0;i--)); do
-	if [ ! -e "$dm" ] || output=$(dmsetup remove "$dm" 2>&1); then
+	if [ ! -e "/dev/mapper/$dm" ] ||
+	       output=$(dmsetup remove "$dm" 2>&1); then
 	    echo "done"
 	    break
 	fi
@@ -308,7 +345,7 @@ remove_nvme_mpath_devs() {
 	d=$(basename "$(dirname "$(dirname "$h")")")
 	dm=/dev/$(basename "$h")
 	echo -n "NVME dev $d: removing $dm: "
-	dmsetup remove "$dm" && echo "done"
+	dmsetup remove "$(dev_to_mpath "$dm")" && echo "done"
     done
 }
 
@@ -718,7 +755,8 @@ stop_scst_srpt() {
 
 # Load and configure the SRP target driver
 start_srpt() {
-    modprobe brd rd_nr=${#vdev_path[@]} rd_size=$((ramdisk_size>>10))
+    have_brd &&
+	modprobe brd rd_nr=${#vdev_path[@]} rd_size=$((ramdisk_size>>10))
     modprobe ib_uverbs
     modprobe ib_umad
     modprobe rdma_cm
@@ -737,8 +775,10 @@ stop_srpt() {
 	scst) stop_scst_srpt;;
 	*)    false;;
     esac || return $?
-    unload_module brd || return $?
-    rm -f "${vdev_path[@]}"
+    if have_brd; then
+	unload_module brd || return $?
+	rm -f "${vdev_path[@]}"
+    fi
     echo "Unloaded the ib_srpt kernel module"
 }
 
@@ -761,7 +801,9 @@ configure_nvmet_port() {
 start_nvme_target() {
     local d i ipv4_addr nvme_dev=1
 
-    modprobe brd rd_nr=${#vdev_path[@]} rd_size=$((ramdisk_size>>10)) &&
+    if have_brd; then
+	modprobe brd rd_nr=${#vdev_path[@]} rd_size=$((ramdisk_size>>10))
+    fi &&
 	modprobe nvme dyndbg=+pmf &&
 	modprobe nvmet-rdma dyndbg=+pmf &&
 	(
@@ -804,7 +846,7 @@ stop_nvme_target() {
     )
     unload_module nvmet_rdma &&
     unload_module nvmet &&
-    unload_module brd
+    have_brd && unload_module brd
 }
 
 start_target() {
@@ -894,7 +936,14 @@ run_fio() {
 	esac
     done
     if [ -n "$d" ]; then
-	a=$(df --output=avail "$d" | tail -n1)
+	a=$(df "$d" | grep "^/" |
+		{
+		    if read -r fs blocks used avail use mnt; then
+			echo "$avail"
+			echo "$fs $blocks $used $use $mnt" >/dev/null
+		    fi
+		}
+	 )
 	args+=(--size=$((a*1024/j - 16*1024)))
     fi
     for opt in --exitall_on_error=1 --gtod_reduce=1; do
